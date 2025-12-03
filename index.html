@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FedRick - FED KIIT Assistant</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6;
+        }
+
+        /* Custom Scrollbar */
+        .scrollbar-hide::-webkit-scrollbar {
+            display: none;
+        }
+        .scrollbar-hide {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+        
+        .typing-dot {
+            animation: typing 1.4s infinite ease-in-out both;
+        }
+        .typing-dot:nth-child(1) { animation-delay: -0.32s; }
+        .typing-dot:nth-child(2) { animation-delay: -0.16s; }
+        
+        @keyframes typing {
+            0%, 80%, 100% { transform: scale(0); }
+            40% { transform: scale(1); }
+        }
+
+        .fade-in-up {
+            animation: fadeInUp 0.3s ease-out;
+        }
+        
+        @keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body class="h-screen w-full flex items-center justify-center bg-gray-100">
+
+    <!-- Main Container -->
+    <div class="relative w-full h-full max-w-md mx-auto bg-white sm:h-[600px] sm:rounded-2xl sm:shadow-2xl overflow-hidden flex flex-col border border-gray-200">
+        
+        <!-- Header -->
+        <div class="bg-gray-900 text-white p-4 flex items-center justify-between shadow-md z-10">
+            <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 bg-gradient-to-tr from-orange-500 to-pink-500 rounded-full flex items-center justify-center shadow-lg">
+                    <i class="fa-solid fa-robot text-white text-lg"></i>
+                </div>
+                <div>
+                    <h1 class="font-bold text-lg leading-tight">FedRick</h1>
+                    <p class="text-xs text-gray-400">FED KIIT Assistant</p>
+                </div>
+            </div>
+            <!-- Settings button removed as per user request -->
+        </div>
+
+        <!-- Chat Area -->
+        <div id="chat-container" class="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50">
+            <!-- Welcome Message -->
+            <div class="flex justify-start">
+                <div class="max-w-[85%] bg-white border border-gray-200 rounded-2xl rounded-tl-none p-3 shadow-sm">
+                    <p class="text-sm text-gray-800">Hello! I'm <strong>FedRick</strong>, your personal assistant for FED KIIT. 🚀<br><br>Ask me about our team, upcoming events, or how to join the society!</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Input Area -->
+        <div class="p-4 bg-white border-t border-gray-100">
+            <form id="chat-form" class="flex items-center space-x-2">
+                <input type="text" id="user-input" placeholder="Ask about events, team, roles..." class="flex-1 bg-gray-100 text-gray-800 text-sm rounded-full px-4 py-3 focus:outline-none focus:ring-2 focus:ring-orange-500 transition placeholder-gray-400" autocomplete="off">
+                <button type="submit" id="send-btn" class="w-10 h-10 bg-gray-900 rounded-full flex items-center justify-center text-white hover:bg-orange-600 transition shadow-md disabled:opacity-50 disabled:cursor-not-allowed">
+                    <i class="fa-solid fa-paper-plane text-sm"></i>
+                </button>
+            </form>
+        </div>
+
+    </div>
+
+    <script>
+        // --- Configuration & API Key ---
+        const GEMINI_API_KEY = "AIzaSyCaXD0g2YHeZrAbcw0nz_0PvyOsztXDqpQ"; 
+        
+        // --- Global State & Cache ---
+        const TEAM_API_URL = 'https://api.fedkiit.com/api/user/fetchTeam';
+        let cachedTeamMembers = [];
+        let lastFetchTime = 0;
+        const CACHE_DURATION = 120000; // 2 minutes (120,000 milliseconds)
+
+        // --- DOM Elements ---
+        const chatContainer = document.getElementById('chat-container');
+        const chatForm = document.getElementById('chat-form');
+        const userInput = document.getElementById('user-input');
+        const sendBtn = document.getElementById('send-btn');
+
+
+        // --- Live Team Data Fetching & Caching ---
+        
+        /**
+         * Fetches, filters, and sorts the team data from the live API, and caches it.
+         */
+        async function fetchAndCacheTeamData() {
+            const now = Date.now();
+            
+            // Do not fetch if cache is fresh
+            if (now - lastFetchTime < CACHE_DURATION && cachedTeamMembers.length > 0) {
+                console.log("Team data cache is fresh.");
+                return;
+            }
+
+            console.log("Fetching fresh team data from API...");
+            try {
+                // Implementing exponential backoff for robustness
+                const maxRetries = 3;
+                let response;
+                let delay = 1000;
+
+                for (let i = 0; i < maxRetries; i++) {
+                    try {
+                        response = await fetch(TEAM_API_URL);
+                        if (response.ok) break; 
+                    } catch (e) {
+                        // Network error, retry after delay
+                        await new Promise(resolve => setTimeout(resolve, delay));
+                        delay *= 2; // Exponential backoff
+                    }
+                    if (i === maxRetries - 1) throw new Error("Failed to fetch team data after multiple retries.");
+                }
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const data = await response.json();
+                
+                if (data.success && data.data) {
+                    // 1. Filter out null names, as per website logic
+                    const validMembers = data.data.filter(
+                        (member) => member.name !== null
+                    );
+                    
+                    // 2. Sort by year (descending) then by name (alphabetically), as per website logic
+                    const sortedMembers = validMembers.sort((a, b) => {
+                        // Sort by year (descending)
+                        if (b.year !== a.year) {
+                            return b.year - a.year;
+                        }
+                        // Sort by name (alphabetically)
+                        return a.name.localeCompare(b.name);
+                    });
+
+                    cachedTeamMembers = sortedMembers;
+                    lastFetchTime = now;
+                    console.log(`Successfully fetched and cached ${cachedTeamMembers.length} team members.`);
+                } else {
+                    console.error("API response success: false", data);
+                    cachedTeamMembers = [];
+                }
+
+            } catch (error) {
+                console.error("Error fetching live team data:", error);
+                // In case of error, rely on stale cache if available, or empty array.
+            }
+        }
+
+
+        // --- UI Functions ---
+
+        function addMessage(role, text) {
+            const div = document.createElement('div');
+            div.className = `flex ${role === 'user' ? 'justify-end' : 'justify-start'} fade-in-up`;
+            
+            const bubble = document.createElement('div');
+            bubble.className = `max-w-[85%] p-3 shadow-sm text-sm ${
+                role === 'user' 
+                ? 'bg-gray-900 text-white rounded-2xl rounded-tr-none' 
+                : 'bg-white border border-gray-200 text-gray-800 rounded-2xl rounded-tl-none'
+            }`;
+            
+            // Handle markdown-style basics (bolding)
+            bubble.innerHTML = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\n/g, '<br>');
+
+            div.appendChild(bubble);
+            chatContainer.appendChild(div);
+            scrollToBottom();
+        }
+
+        function addLoadingIndicator() {
+            const div = document.createElement('div');
+            div.id = 'loading-indicator';
+            div.className = 'flex justify-start fade-in-up';
+            div.innerHTML = `
+                <div class="bg-white border border-gray-200 rounded-2xl rounded-tl-none p-4 shadow-sm flex space-x-1">
+                    <div class="w-2 h-2 bg-gray-400 rounded-full typing-dot"></div>
+                    <div class="w-2 h-2 bg-gray-400 rounded-full typing-dot"></div>
+                    <div class="w-2 h-2 bg-gray-400 rounded-full typing-dot"></div>
+                </div>
+            `;
+            chatContainer.appendChild(div);
+            scrollToBottom();
+        }
+
+        function removeLoadingIndicator() {
+            const el = document.getElementById('loading-indicator');
+            if (el) el.remove();
+        }
+
+        function scrollToBottom() {
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+
+        // --- Gemini API Logic ---
+
+        // Extended System Prompt to handle the injected live team data
+        const SYSTEM_PROMPT = `
+        You are FedRick, the intelligent chatbot for FED Website.
+        FED means (Federation of Entrepreneurship Development) at KIIT University.
+        
+        **YOUR MISSION:**
+        Answer user queries specifically related to the FED KIIT website, its team, events, and operations.
+        
+        **LIVE DATA INJECTION:**
+        The user query will be prepended with the current list of FED Team Members in JSON format.
+        
+        1. **PRIORITIZE** this injected team data for all questions about roles, current members, and team structure.
+        2. The key properties in the JSON are: 'name', 'access' (role code, e.g., PRESIDENT, DIRECTOR_TECHNICAL), 'year', and 'extra' (for designation, LinkedIn).
+        3. Translate the 'access' codes into friendly titles (e.g., DIRECTOR_TECHNICAL -> Director of Technical Team).
+        
+        **STRICT GUARDRAILS:**
+        1. **NO MATH:** If a user asks you to solve a math problem, politely refuse: "I am designed to help with FED KIIT related queries only. I cannot help with math assignments."
+        2. **NO IMAGE GENERATION:** Refuse: "I cannot generate images. I am a text-based assistant for FED."
+        3. **NO OFF-TOPIC:** Guide them back to FED: "I can only assist with information regarding the Federation of Entrepreneurship Development."
+        4. **TONE:** Professional, enthusiastic, entrepreneurial, and helpful. Use emojis occasionally (🚀, 💡).
+        5. **Don't create tables:** if many members are present, name them instead of creating table. 
+
+        **KNOWLEDGE BASE (General Info):**
+        
+        * **About FED:** The Federation of Entrepreneurship Development (FED) is the official student body of KIIT TBI (Technology Business Incubator). We aim to nurture entrepreneurship through creative strategies, bringing potential startups under one umbrella.
+        * **Motto:** "Nurturing Using Innovative & Creative strategies."
+        * **Location:** Campus 11, KIIT Deemed to be University, Bhubaneswar, Odisha, 751024.
+        * **Contact:** fedkiit@gmail.com
+        * **Social Media:** Instagram (@fedkiit), LinkedIn, Twitter.
+        
+        * **Major Events:** Omega (Flagship), Skill Hunt, Let's Talk Business (Podcast).
+        * **Registration/Joining:** Open to KIIT students. Visit the website to "Join Community."
+        `;
+
+        async function generateResponse(query) {
+            const key = GEMINI_API_KEY;
+            
+            // 1. Ensure team data is fresh or fetched for context
+            await fetchAndCacheTeamData();
+
+            // 2. Prepare the context for the model
+            const teamContext = cachedTeamMembers.length > 0 
+                ? "### LIVE TEAM DATA START ###\nTeam members list (JSON array, use this data source for current roles/names):\n" + JSON.stringify(cachedTeamMembers) + "\n### LIVE TEAM DATA END ###"
+                : "No live team data is currently available. Base your answer only on your general knowledge base.";
+            
+            const finalPrompt = `${teamContext}\n\nUser Query: ${query}`;
+
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${key}`;
+
+            // Implementing exponential backoff for API call
+            const maxRetries = 3;
+            let response;
+            let delay = 1000;
+
+            for (let i = 0; i < maxRetries; i++) {
+                try {
+                    response = await fetch(url, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            contents: [{ role: "user", parts: [{ text: finalPrompt }] }],
+                            systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] }
+                        })
+                    });
+                    if (response.ok) break; 
+                } catch (e) {
+                    // Network error, retry after delay
+                    await new Promise(resolve => setTimeout(resolve, delay));
+                    delay *= 2; // Exponential backoff
+                }
+                if (i === maxRetries - 1) throw new Error("Failed to get Gemini response after multiple retries.");
+            }
+
+
+            try {
+                // If we reach here, response should be OK or we threw an error above.
+                if (!response.ok) {
+                    throw new Error(`API Error: ${response.status}`);
+                }
+
+                const data = await response.json();
+                const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+                
+                if (!text) {
+                     return "Sorry, I received an empty response from the AI model. Please try a different query.";
+                }
+
+                return text;
+
+            } catch (error) {
+                console.error(error);
+                if (error.message.includes("400") || error.message.includes("403")) {
+                    return "Error: An API configuration issue occurred. Please verify your GEMINI_API_KEY in the script.";
+                }
+                return "Sorry, I'm having trouble connecting to the server right now. Please try again later.";
+            }
+        }
+
+        // --- Event Listeners ---
+
+        // Initial fetch of team data when the app starts
+        fetchAndCacheTeamData();
+
+        chatForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const text = userInput.value.trim();
+            if (!text) return;
+
+            // Add User Message
+            addMessage('user', text);
+            userInput.value = '';
+            sendBtn.disabled = true;
+
+            // Show Loading
+            addLoadingIndicator();
+
+            // Get Bot Response
+            const response = await generateResponse(text);
+
+            // Remove Loading & Add Bot Message
+            removeLoadingIndicator();
+            addMessage('bot', response);
+            sendBtn.disabled = false;
+        });
+
+    </script>
+</body>
+</html>
