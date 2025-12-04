@@ -216,7 +216,7 @@
                     return dateB.getTime() - dateA.getTime();
                     });
 
-                    cachedEvents = { upcomingEvents, sortedEvents };
+                    cachedEvents = { upcomingEvents: upcomingEvents, sortedEvents: sortedEvents.slice(0, 5)};
                     lastEventsFetchTime = now;
                     console.log(`Successfully fetched and cached ${cachedEvents.length} events.`);
                 } else {
