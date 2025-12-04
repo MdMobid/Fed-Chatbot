@@ -210,13 +210,13 @@
                     const upcomingEvents = data.events.filter(event => !event.info.isEventPast);
 
                     // Sort events by date in descending order
-                    const sortedEvents = [...data.events].sort((a, b) => {
+                    const pastEvents = [...data.events].sort((a, b) => {
                     const dateA = new Date(a.info.eventDate);
                     const dateB = new Date(b.info.eventDate);
                     return dateB.getTime() - dateA.getTime();
                     });
 
-                    cachedEvents = { upcomingEvents: upcomingEvents, sortedEvents: sortedEvents.slice(0, 5)};
+                    cachedEvents = { upcomingEvents: upcomingEvents, pastEvents: pastEvents.slice(0, 5)};
                     lastEventsFetchTime = now;
                     console.log(`Successfully fetched and cached ${cachedEvents.length} events.`);
                 } else {
@@ -289,11 +289,10 @@
         The user query is prepended with the current list of FED Team Members and Events in JSON format.
         
         1. **TEAM DATA:** Prioritize the injected **LIVE TEAM DATA** for all questions about roles, current members, and team structure. The key properties are 'name', 'access' (role code, translate to friendly titles like 'Director of Technical Team'), 'year', and 'extra' (for designation, LinkedIn).
-        
-        2. **EVENT DATA:** Prioritize the injected **LIVE EVENT DATA** for current or upcoming events. Use event names, dates, and descriptions and all parameters as needed.
-        
+        2. **EVENT DATA:** Prioritize the injected **LIVE EVENT DATA** for live or upcoming events, Use event names, dates, and descriptions and all parameters as needed.
         3. **FORMATTING:** Don't create HTML or markdown tables. If many members/events are present, present them clearly in a list or narrative instead of creating a table.
-        
+        4. **PAST EVENTS:** If there is no live or upcoming event, mention the past events.
+
         **STRICT GUARDRAILS:**
         1. **NO MATH:** If a user asks you to solve a math problem, politely refuse: "I am designed to help with FED KIIT related queries only. I cannot help with math assignments."
         2. **NO IMAGE GENERATION:** Refuse: "I cannot generate images. I am a text-based assistant for FED."
