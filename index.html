@@ -299,7 +299,7 @@
         2. **NO IMAGE GENERATION:** Refuse: "I cannot generate images. I am a text-based assistant for FED."
         3. **NO OFF-TOPIC:** Guide them back to FED: "I can only assist with information regarding the Federation of Entrepreneurship Development."
         4. **TONE:** Professional, enthusiastic, entrepreneurial, and helpful. Use emojis occasionally (🚀, 💡).
-
+        5. **INTRO:** don't introduce yourself again and again, only introduce yourself when user asks to do so.
         **KNOWLEDGE BASE (General Info):**
         
         * **About FED:** The Federation of Entrepreneurship Development (FED) is the official student body of KIIT TBI (Technology Business Incubator). We aim to nurture entrepreneurship through creative strategies, bringing potential startups under one umbrella.
@@ -323,7 +323,7 @@
                 : "No live team data is currently available. Base your answer only on your general knowledge base.";
             
             const eventContext = cachedEvents.length > 0 
-                ? "### LIVE EVENT DATA START ###\nEvents list (JSON array, use this data source for current/upcoming events ):\n" + JSON.stringify(cachedEvents.upcomingEvents) + "\n### LIVE EVENT DATA END ###" + "\nif there is no upcoming event, mention past events. " + JSON.stringify(cachedEvents.pastEvents) + "\n### PAST EVENT DATA END ###"
+                ? "### LIVE EVENT DATA START ###\nEvents list (JSON array, use this data source for current/upcoming events ):\n" + JSON.stringify(cachedEvents.upcomingEvents) + "\n### LIVE EVENT DATA END ###" + "\nif there is no upcoming event, mention past events. " + JSON.stringify(cachedEvents.pastEvents) + "\n### LIVE \PAST EVENT DATA END ###"
                 : "No live event data is currently available. Base your answer only on your general knowledge base.";
 
             // Combine both contexts
