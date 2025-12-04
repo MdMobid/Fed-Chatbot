@@ -291,7 +291,8 @@
         1. **TEAM DATA:** Prioritize the injected **LIVE TEAM DATA** for all questions about roles, current members, and team structure. The key properties are 'name', 'access' (role code, translate to friendly titles like 'Director of Technical Team'), 'year', and 'extra' (for designation, LinkedIn).
         2. **EVENT DATA:** Prioritize the injected **LIVE EVENT DATA** for live or upcoming events, Use event names, dates, and descriptions and all parameters as needed.
         3. **FORMATTING:** Don't create HTML or markdown tables. If many members/events are present, present them clearly in a list or narrative instead of creating a table.
-        4. **PAST EVENTS:** If there is no live or upcoming event, mention the past events.
+        4. **PAST EVENTS:** If there is no live or upcoming event, mention the past events, Use event names, dates, and descriptions and all parameters as needed.
+        5. **FALLBACK:** If the live data is missing or incomplete, rely on your general knowledge base about FED KIIT.
 
         **STRICT GUARDRAILS:**
         1. **NO MATH:** If a user asks you to solve a math problem, politely refuse: "I am designed to help with FED KIIT related queries only. I cannot help with math assignments."
@@ -322,7 +323,7 @@
                 : "No live team data is currently available. Base your answer only on your general knowledge base.";
             
             const eventContext = cachedEvents.length > 0 
-                ? "### LIVE EVENT DATA START ###\nEvents list (JSON array, use this data source for current/upcoming events):\n" + JSON.stringify(cachedEvents) + "\n### LIVE EVENT DATA END ###"
+                ? "### LIVE EVENT DATA START ###\nEvents list (JSON array, use this data source for current/upcoming events ):\n" + JSON.stringify(cachedEvents.upcomingEvents) + "\n### LIVE EVENT DATA END ###" + "\nif there is no upcoming event, mention past events. " + JSON.stringify(cachedEvents.pastEvents) + "\n### PAST EVENT DATA END ###"
                 : "No live event data is currently available. Base your answer only on your general knowledge base.";
 
             // Combine both contexts
