@@ -207,14 +207,16 @@
                         (event) => event.formName && event.formType === 'Event'
                     );
                     
-                    // Sort by creation date (newest first) to prioritize recent/upcoming events
-                    const sortedEvents = validEvents.sort((a, b) => {
-                        const dateA = new Date(a.createdAt || 0);
-                        const dateB = new Date(b.createdAt || 0);
-                        return dateB - dateA; 
+                    const upcomingEvents = data.events.filter(event => !event.info.isEventPast);
+
+                    // Sort events by date in descending order
+                    const sortedEvents = [...data.events].sort((a, b) => {
+                    const dateA = new Date(a.info.eventDate);
+                    const dateB = new Date(b.info.eventDate);
+                    return dateB.getTime() - dateA.getTime();
                     });
 
-                    cachedEvents = sortedEvents;
+                    cachedEvents = { upcomingEvents, sortedEvents };
                     lastEventsFetchTime = now;
                     console.log(`Successfully fetched and cached ${cachedEvents.length} events.`);
                 } else {
