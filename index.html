@@ -199,13 +199,12 @@
             try {
                 const response = await fetchWithBackoff(EVENTS_API_URL);
 
-                const data = await response.json();
+                const eventsData = await response.json();
                 
-                if (data.success && data.data) {
-                    // Filter for entries that are designated as 'Event' and have a name
-                    const validEvents = data.data.filter(
-                        (event) => event.formName && event.formType === 'Event'
-                    );
+                if (eventsData.success && eventsData.data) {
+                        
+                    const allEventsArray = eventsData.events || eventsData.data || eventsData;
+                    const data = allEventsArray;
                     
                     const upcomingEvents = data.events.filter(event => !event.info.isEventPast);
 
