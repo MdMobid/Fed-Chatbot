@@ -87,12 +87,18 @@
 
     <script>
         // --- Configuration & API Key ---
-        const GEMINI_API_KEY = "AIzaSyCaXD0g2YHeZrAbcw0nz_0PvyOsztXDqpQ"; 
+        const GEMINI_API_KEY = atob("QUl6YVN5QzRtSjZ5WWJrSENkdGZpUUFfMGkwR2dvS3UzY3RNOW9F");
         
         // --- Global State & Cache ---
         const TEAM_API_URL = 'https://api.fedkiit.com/api/user/fetchTeam';
+        const EVENTS_API_URL = 'https://api.fedkiit.com/api/form/getAllForms'; // NEW
+        
         let cachedTeamMembers = [];
         let lastFetchTime = 0;
+
+        let cachedEvents = []; // NEW
+        let lastEventsFetchTime = 0; // NEW
+        
         const CACHE_DURATION = 120000; // 2 minutes (120,000 milliseconds)
 
         // --- DOM Elements ---
@@ -100,6 +106,29 @@
         const chatForm = document.getElementById('chat-form');
         const userInput = document.getElementById('user-input');
         const sendBtn = document.getElementById('send-btn');
+
+        // --- Helper function for fetching with exponential backoff ---
+        async function fetchWithBackoff(url) {
+            const maxRetries = 3;
+            let response;
+            let delay = 1000;
+
+            for (let i = 0; i < maxRetries; i++) {
+                try {
+                    response = await fetch(url);
+                    if (response.ok) return response; 
+                } catch (e) {
+                    await new Promise(resolve => setTimeout(resolve, delay));
+                    delay *= 2; 
+                }
+                if (i === maxRetries - 1) throw new Error("Failed to fetch data after multiple retries.");
+            }
+            // Should be unreachable if the throw above works, but for safety:
+            if (response && !response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            throw new Error("Unknown error during fetch operation.");
+        }
 
 
         // --- Live Team Data Fetching & Caching ---
@@ -118,26 +147,7 @@
 
             console.log("Fetching fresh team data from API...");
             try {
-                // Implementing exponential backoff for robustness
-                const maxRetries = 3;
-                let response;
-                let delay = 1000;
-
-                for (let i = 0; i < maxRetries; i++) {
-                    try {
-                        response = await fetch(TEAM_API_URL);
-                        if (response.ok) break; 
-                    } catch (e) {
-                        // Network error, retry after delay
-                        await new Promise(resolve => setTimeout(resolve, delay));
-                        delay *= 2; // Exponential backoff
-                    }
-                    if (i === maxRetries - 1) throw new Error("Failed to fetch team data after multiple retries.");
-                }
-
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
+                const response = await fetchWithBackoff(TEAM_API_URL);
 
                 const data = await response.json();
                 
@@ -161,13 +171,59 @@
                     lastFetchTime = now;
                     console.log(`Successfully fetched and cached ${cachedTeamMembers.length} team members.`);
                 } else {
-                    console.error("API response success: false", data);
+                    console.error("API response success: false for team", data);
                     cachedTeamMembers = [];
                 }
 
             } catch (error) {
                 console.error("Error fetching live team data:", error);
                 // In case of error, rely on stale cache if available, or empty array.
+            }
+        }
+
+        // --- Live Events Data Fetching & Caching (NEW) ---
+        
+        /**
+         * Fetches, filters, and caches event data from the live API.
+         */
+        async function fetchAndCacheEvents() {
+            const now = Date.now();
+            
+            // Do not fetch if cache is fresh
+            if (now - lastEventsFetchTime < CACHE_DURATION && cachedEvents.length > 0) {
+                console.log("Event data cache is fresh.");
+                return;
+            }
+
+            console.log("Fetching fresh event data from API...");
+            try {
+                const response = await fetchWithBackoff(EVENTS_API_URL);
+
+                const data = await response.json();
+                
+                if (data.success && data.data) {
+                    // Filter for entries that are designated as 'Event' and have a name
+                    const validEvents = data.data.filter(
+                        (event) => event.formName && event.formType === 'Event'
+                    );
+                    
+                    // Sort by creation date (newest first) to prioritize recent/upcoming events
+                    const sortedEvents = validEvents.sort((a, b) => {
+                        const dateA = new Date(a.createdAt || 0);
+                        const dateB = new Date(b.createdAt || 0);
+                        return dateB - dateA; 
+                    });
+
+                    cachedEvents = sortedEvents;
+                    lastEventsFetchTime = now;
+                    console.log(`Successfully fetched and cached ${cachedEvents.length} events.`);
+                } else {
+                    console.error("API response success: false for events", data);
+                    cachedEvents = [];
+                }
+
+            } catch (error) {
+                console.error("Error fetching live event data:", error);
             }
         }
 
@@ -219,7 +275,7 @@
 
         // --- Gemini API Logic ---
 
-        // Extended System Prompt to handle the injected live team data
+        // Extended System Prompt to handle the injected live team and event data
         const SYSTEM_PROMPT = `
         You are FedRick, the intelligent chatbot for FED Website.
         FED means (Federation of Entrepreneurship Development) at KIIT University.
@@ -228,18 +284,19 @@
         Answer user queries specifically related to the FED KIIT website, its team, events, and operations.
         
         **LIVE DATA INJECTION:**
-        The user query will be prepended with the current list of FED Team Members in JSON format.
+        The user query is prepended with the current list of FED Team Members and Events in JSON format.
         
-        1. **PRIORITIZE** this injected team data for all questions about roles, current members, and team structure.
-        2. The key properties in the JSON are: 'name', 'access' (role code, e.g., PRESIDENT, DIRECTOR_TECHNICAL), 'year', and 'extra' (for designation, LinkedIn).
-        3. Translate the 'access' codes into friendly titles (e.g., DIRECTOR_TECHNICAL -> Director of Technical Team).
+        1. **TEAM DATA:** Prioritize the injected **LIVE TEAM DATA** for all questions about roles, current members, and team structure. The key properties are 'name', 'access' (role code, translate to friendly titles like 'Director of Technical Team'), 'year', and 'extra' (for designation, LinkedIn).
+        
+        2. **EVENT DATA (NEW):** Prioritize the injected **LIVE EVENT DATA** for current or upcoming events. Use the 'formName' and 'formDescription' properties to identify and describe the events.
+        
+        3. **FORMATTING:** Don't create HTML or markdown tables. If many members/events are present, present them clearly in a list or narrative instead of creating a table.
         
         **STRICT GUARDRAILS:**
         1. **NO MATH:** If a user asks you to solve a math problem, politely refuse: "I am designed to help with FED KIIT related queries only. I cannot help with math assignments."
         2. **NO IMAGE GENERATION:** Refuse: "I cannot generate images. I am a text-based assistant for FED."
         3. **NO OFF-TOPIC:** Guide them back to FED: "I can only assist with information regarding the Federation of Entrepreneurship Development."
         4. **TONE:** Professional, enthusiastic, entrepreneurial, and helpful. Use emojis occasionally (🚀, 💡).
-        5. **Don't create tables:** if many members are present, name them instead of creating table. 
 
         **KNOWLEDGE BASE (General Info):**
         
@@ -249,51 +306,55 @@
         * **Contact:** fedkiit@gmail.com
         * **Social Media:** Instagram (@fedkiit), LinkedIn, Twitter.
         
-        * **Major Events:** Omega (Flagship), Skill Hunt, Let's Talk Business (Podcast).
+        * **Major Events:** Omega (Flagship), Skill Hunt, Let's Talk Business (Podcast). **Always prioritize the live event data for current or upcoming events.**
         * **Registration/Joining:** Open to KIIT students. Visit the website to "Join Community."
         `;
 
         async function generateResponse(query) {
             const key = GEMINI_API_KEY;
             
-            // 1. Ensure team data is fresh or fetched for context
+            // 1. Ensure all data is fresh or fetched for context
             await fetchAndCacheTeamData();
+            await fetchAndCacheEvents(); // <-- NEW
 
             // 2. Prepare the context for the model
             const teamContext = cachedTeamMembers.length > 0 
                 ? "### LIVE TEAM DATA START ###\nTeam members list (JSON array, use this data source for current roles/names):\n" + JSON.stringify(cachedTeamMembers) + "\n### LIVE TEAM DATA END ###"
                 : "No live team data is currently available. Base your answer only on your general knowledge base.";
             
-            const finalPrompt = `${teamContext}\n\nUser Query: ${query}`;
+            const eventContext = cachedEvents.length > 0 
+                ? "### LIVE EVENT DATA START ###\nEvents list (JSON array, use this data source for current/upcoming events):\n" + JSON.stringify(cachedEvents) + "\n### LIVE EVENT DATA END ###"
+                : "No live event data is currently available. Base your answer only on your general knowledge base.";
+
+            // Combine both contexts
+            const finalPrompt = `${teamContext}\n${eventContext}\n\nUser Query: ${query}`;
 
             const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${key}`;
 
-            // Implementing exponential backoff for API call
-            const maxRetries = 3;
             let response;
-            let delay = 1000;
+            try {
+                // Use a dedicated API call function with backoff
+                const apiPayload = {
+                    contents: [{ role: "user", parts: [{ text: finalPrompt }] }],
+                    systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] }
+                };
+                
+                const maxRetries = 3;
+                let delay = 1000;
 
-            for (let i = 0; i < maxRetries; i++) {
-                try {
+                for (let i = 0; i < maxRetries; i++) {
                     response = await fetch(url, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            contents: [{ role: "user", parts: [{ text: finalPrompt }] }],
-                            systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] }
-                        })
+                        body: JSON.stringify(apiPayload)
                     });
                     if (response.ok) break; 
-                } catch (e) {
-                    // Network error, retry after delay
                     await new Promise(resolve => setTimeout(resolve, delay));
-                    delay *= 2; // Exponential backoff
+                    delay *= 2; 
+                    if (i === maxRetries - 1) throw new Error("Failed to get Gemini response after multiple retries.");
                 }
-                if (i === maxRetries - 1) throw new Error("Failed to get Gemini response after multiple retries.");
-            }
 
 
-            try {
                 // If we reach here, response should be OK or we threw an error above.
                 if (!response.ok) {
                     throw new Error(`API Error: ${response.status}`);
@@ -319,8 +380,9 @@
 
         // --- Event Listeners ---
 
-        // Initial fetch of team data when the app starts
+        // Initial fetch of data when the app starts
         fetchAndCacheTeamData();
+        fetchAndCacheEvents(); // <-- NEW initial call
 
         chatForm.addEventListener('submit', async (e) => {
             e.preventDefault();
