@@ -317,8 +317,8 @@
             await fetchAndCacheEvents(); // <-- NEW
 
             // 2. Prepare the context for the model
-            const teamContext = cachedTeamMembers.length > 0 ? "### LIVE TEAM DATA START ###\nTeam members list (JSON array, use this data source for current roles/names):\n" + JSON.stringify(cachedTeamMembers) + "\n### LIVE TEAM DATA END ###";
-            const eventContext = cachedEvents.length > 0 ? "### LIVE EVENT DATA START ###\nEvents list (JSON array, use this data source for current/upcoming events ):\n" + JSON.stringify(cachedEvents.upcomingEvents) + "\n### LIVE EVENT DATA END ###" + "\nif there is no upcoming event, mention past events. " + JSON.stringify(cachedEvents.pastEvents) + "\n### LIVE \PAST EVENT DATA END ###"
+            const teamContext = "### LIVE TEAM DATA START ###\nTeam members list (JSON array, use this data source for current roles/names):\n" + JSON.stringify(cachedTeamMembers) + "\n### LIVE TEAM DATA END ###";
+            const eventContext = "### LIVE EVENT DATA START ###\nEvents list (JSON array, use this data source for current/upcoming events ):\n" + JSON.stringify(cachedEvents.upcomingEvents) + "\n### LIVE EVENT DATA END ###" + "\nif there is no upcoming event, mention past events. " + JSON.stringify(cachedEvents.pastEvents) + "\n### LIVE PAST EVENT DATA END ###"
 
             // Combine both contexts
             const finalPrompt = `${teamContext}\n${eventContext}\n\nUser Query: ${query}`;
