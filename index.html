@@ -209,7 +209,7 @@
                     });
                     const pastEvents = rawPastEvents.map(event => event.info);
                     cachedEvents = { upcomingEvents: upcomingEvents, pastEvents: pastEvents.slice(0, 5) };
-                    lastFetchTime = now;
+                    lastEventsFetchTime = now;
                     const totalCached = upcomingEvents.length + pastEvents.length;
                     console.log(`Successfully fetched and cached ${totalCached} events.`);
                 } else {
