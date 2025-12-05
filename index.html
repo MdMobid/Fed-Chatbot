@@ -200,29 +200,23 @@
                 const response = await fetchWithBackoff(EVENTS_API_URL);
 
                 const eventsData = await response.json();
-                
-                if (eventsData.success && eventsData.data) {
-                        
-                    const allEventsArray = eventsData.events || eventsData.data || eventsData;
-                    const data = allEventsArray;
-                    
-                    const upcomingEvents = data.events.filter(event => !event.info.isEventPast);
-
-                    // Sort events by date in descending order
-                    const pastEvents = [...data.events].sort((a, b) => {
-                    const dateA = new Date(a.info.eventDate);
-                    const dateB = new Date(b.info.eventDate);
-                    return dateB.getTime() - dateA.getTime();
+                if (eventsData.success && eventsData) {
+                    const upcomingEvents = eventsData.events.filter(event => !event.info.isEventPast);
+                    const rawPastEvents = [...eventsData.events].sort((a, b) => {
+                        const dateA = new Date(a.info.eventDate);
+                        const dateB = new Date(b.info.eventDate);
+                        return dateB.getTime() - dateA.getTime();
                     });
-
-                    cachedEvents = { upcomingEvents: upcomingEvents, pastEvents: pastEvents.slice(0, 5)};
-                    lastEventsFetchTime = now;
-                    console.log(`Successfully fetched and cached ${cachedEvents.length} events.`);
+                    const pastEvents = rawPastEvents.map(event => event.info);
+                    cachedEvents = { upcomingEvents: upcomingEvents, pastEvents: pastEvents.slice(0, 5) };
+                    lastFetchTime2 = now;
+                    const totalCached = upcomingEvents.length + pastEvents.length;
+                    console.log(`Successfully fetched and cached ${totalCached} events.`);
                 } else {
-                    console.error("API response success: false for events", data);
+                    console.error("API response success: false", eventsData);
                     cachedEvents = [];
                 }
-
+                
             } catch (error) {
                 console.error("Error fetching live event data:", error);
             }
